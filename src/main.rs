@@ -1,45 +1,134 @@
 use std::collections::HashMap;
-type NormalForm = String;
-type Def = HashMap<String, NormalForm>;
-type Scopes = Vec<String>;
+use thiserror::Error;
+use uuid::Uuid;
 
-#[derive(Debug, Clone)]
-struct Defs(HashMap<String, Def>);
-
-fn main() {
-    println!("Scop!");
-
-    let mut defs = Defs::new();
-    let mut global = Def::new();
-
-    global.insert("1".into(), "one".into());
-    global.insert("2".into(), "two".into());
-
-    defs.0.insert("global".into(), global);
-    let mut scopes = Scopes::new();
-    scopes.push("global".into());
-
-    dbg!(&defs);
-
-    let id = "1".to_string();
-
-    let result = defs.find(id, &scopes);
-    dbg!(result);
+#[derive(Error, Debug)]
+pub enum ScopError {
+    #[error("`{0}`")]
+    Error(String),
 }
 
-impl Defs {
+type NormalForm = i32;
+type Def<T> = HashMap<String, T>;
+// type Scope = Vec<String>;
+#[derive(Debug, Clone)]
+struct Scopes(Vec<String>);
+
+#[derive(Debug, Clone)]
+struct Defs<T>(HashMap<String, Def<T>>);
+
+fn main() -> Result<(), ScopError> {
+    println!("Scop!");
+    let mut defs: Defs<NormalForm> = Defs::new();
+    let mut scopes = Scopes::new();
+
+    defs.insert("global", "1", 1)?;
+    defs.insert("global", "2", 2)?;
+
+    let new_scope = defs.create_scope(&mut scopes);
+    defs.insert(&new_scope, "3", 3)?;
+
+    let result = defs.find("id", &scopes);
+    dbg!(scopes);
+    dbg!(defs);
+    dbg!(result);
+
+    Ok(())
+}
+
+impl Scopes {
     pub fn new() -> Self {
-        Defs(HashMap::new())
+        Self(vec!["global".to_string()])
     }
-    pub fn find(&self, id: String, scopes: &Scopes) -> Option<NormalForm> {
-        for scope in scopes {
-            let current = self.0.get(scope).expect("Named scope not found");
-            let result = current.get(&id);
+    pub fn push(&mut self, v: String) {
+        self.0.push(v);
+    }
+}
+
+impl<T> Defs<T>
+where
+    T: Clone + Sized,
+{
+    pub fn new() -> Self {
+        let mut defs = HashMap::new();
+        defs.insert("global".into(), HashMap::new());
+        Self(defs)
+    }
+
+    pub fn create_scope(&mut self, scopes: &mut Scopes) -> String {
+        let new_scope = Uuid::new_v4().to_string();
+        self.0.insert(new_scope.to_string(), Def::new());
+        scopes.push(new_scope.to_string());
+        new_scope
+    }
+
+    pub fn insert(&mut self, scope: &str, name: &str, value: T) -> Result<(), ScopError> {
+        let current_scope = self.0.entry(scope.to_string()).or_insert_with(HashMap::new);
+        current_scope.insert(name.to_string(), value);
+        Ok(())
+    }
+
+    pub fn find(&self, id: &str, scopes: &Scopes) -> Option<T> {
+        for scope in scopes.0.iter().rev() {
+            let current = self
+                .0
+                .get(&scope.to_string())
+                .expect("Named scope not found");
+            let result = current.get(&id.to_string());
             if result.is_some() {
-                return result.map(NormalForm::to_owned);
+                return result.map(T::to_owned);
             }
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_can_insert_and_find_in_global_scope() {
+        let mut defs: Defs<NormalForm> = Defs::new();
+        let scopes = Scopes::new();
+
+        defs.insert("global", "1", 1).unwrap();
+        defs.insert("global", "2", 2).unwrap();
+
+        let found = defs.find("1", &scopes);
+        assert_eq!(found, Some(1));
+        let not_found = defs.find("3".into(), &scopes);
+        assert_eq!(not_found, None);
+    }
+
+    #[test]
+    fn it_can_insert_and_find_with_generated_scope_name() {
+        let mut defs: Defs<NormalForm> = Defs::new();
+        let mut scopes = Scopes::new();
+
+        defs.insert("global", "1", 1).unwrap();
+        defs.insert("global", "2", 2).unwrap();
+
+        let new_scope = defs.create_scope(&mut scopes);
+        defs.insert(&new_scope, "3", 3).unwrap();
+
+        let found = defs.find("3", &scopes);
+        assert_eq!(found, Some(3));
+    }
+
+    #[test]
+    fn it_finds_value_in_inner_scope() {
+        let mut defs: Defs<NormalForm> = Defs::new();
+        let mut scopes = Scopes::new();
+
+        defs.insert("global", "1", 1).unwrap();
+        defs.insert("global", "2", 2).unwrap();
+
+        let new_scope = defs.create_scope(&mut scopes);
+        defs.insert(&new_scope, "1", 10).unwrap();
+
+        let found = defs.find("1", &scopes);
+        assert_eq!(found, Some(10));
     }
 }
