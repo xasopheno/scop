@@ -10,7 +10,6 @@ pub enum ScopError {
 
 type NormalForm = i32;
 type Def<T> = HashMap<String, T>;
-// type Scope = Vec<String>;
 #[derive(Debug, Clone)]
 struct Scopes(Vec<String>);
 
