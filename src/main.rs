@@ -42,7 +42,7 @@ where
         let mut defs = HashMap::new();
         defs.insert("global".into(), HashMap::new());
         Self {
-            defs: defs,
+            defs,
             scopes: vec!["global".to_string()],
         }
     }
@@ -54,7 +54,8 @@ where
         new_scope
     }
 
-    pub fn create_named_scope(&mut self, new_scope: &str) -> () {
+    #[allow(dead_code)]
+    pub fn create_named_scope(&mut self, new_scope: &str) {
         self.defs.insert(new_scope.to_string(), Def::new());
         self.scopes.push(new_scope.to_string());
     }
