@@ -18,6 +18,15 @@ pub struct Defs<T> {
     scopes: Vec<String>,
 }
 
+impl<T> Default for Defs<T>
+where
+    T: Clone + Sized,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> Defs<T>
 where
     T: Clone + Sized,
@@ -43,7 +52,6 @@ where
         self.defs.insert(new_scope.to_string(), Def::new());
         self.scopes.push(new_scope.to_string());
     }
-
     pub fn insert(&mut self, scope: &str, name: &str, value: T) -> Result<(), ScopError> {
         let current_scope = self
             .defs
@@ -102,7 +110,7 @@ mod tests {
     }
 
     #[test]
-    fn it_finds_value_in_innermost_scope() -> Result<(), ScopError> {
+    fn it_ustds_value_in_innermost_scope() -> Result<(), ScopError> {
         let mut defs: Defs<Term> = Defs::new();
 
         defs.insert("global", "1", 1)?;
